@@ -2,8 +2,15 @@
 
 import depthai as dai
 import os
+import sys
 import logging
 import datetime
+
+sys.path.insert(0, os.path.realpath('../'))
+from modules.settings import Settings
+
+settings_grey = Settings("../grey.yaml")
+settings_color = Settings("../color.yaml")
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +59,16 @@ ve3 = pipeline.createVideoEncoder()
 ve3.setDefaultProfilePreset(1280, 720, 30, dai.VideoEncoderProperties.Profile.H264_MAIN)
 monoCam2.out.link(ve3.input)
 
+# Create control inputs
+controlInGrey = pipeline.createXLinkIn()
+controlInGrey.setStreamName('controlGrey')
+controlInGrey.out.link(monoCam.inputControl)
+controlInGrey.out.link(monoCam2.inputControl)
+
+controlInColor = pipeline.createXLinkIn()
+controlInColor.setStreamName('controlColor')
+controlInColor.out.link(colorCam.inputControl)
+
 # Create outputs
 ve1Out = pipeline.createXLinkOut()
 ve1Out.setStreamName('ve1Out')
@@ -70,6 +87,20 @@ ve3.bitstream.link(ve3Out.input)
 with dai.Device(pipeline) as dev:
     # Start pipeline
     dev.startPipeline()
+    controlQueueGrey = dev.getInputQueue('controlGrey')
+    controlQueueColor = dev.getInputQueue('controlColor')
+
+    if settings_grey.get("exp") is not None and settings_grey.get("iso") is not None:
+        ctrl = dai.CameraControl()
+        ctrl.setManualExposure(settings_grey["exp"], settings_grey["iso"])
+        controlQueueGrey.send(ctrl)
+
+    if settings_color.get("autofocus") is not None:
+        if not settings_color["autofocus"]:
+            ctrl = dai.CameraControl()
+            ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.AUTO)
+            ctrl.setAutoFocusTrigger()
+            controlQueueColor.send(ctrl)
 
     # Output queues will be used to get the encoded data from the outputs defined above
     outQ1 = dev.getOutputQueue(name='ve1Out', maxSize=30, blocking=True)
