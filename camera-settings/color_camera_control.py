@@ -12,9 +12,22 @@ To go back to auto controls:
   'E' - autoexposure
   'F' - autofocus (continuous)
 """
+import os
+import sys
 
 import depthai as dai
 import cv2
+
+sys.path.insert(0, os.path.realpath('../'))
+from modules.settings import Settings
+
+settings = Settings("../color.yaml")
+
+default_settings = {
+    "autofocus": False,
+}
+
+settings.update_defaults(default_settings)
 
 # Step size ('W','A','S','D' controls)
 STEP_SIZE = 8
@@ -97,6 +110,12 @@ with dai.Device(pipeline) as dev:
     sensMin = 100
     sensMax = 1600
 
+    if not settings["autofocus"]:
+        ctrl = dai.CameraControl()
+        ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.AUTO)
+        ctrl.setAutoFocusTrigger()
+        controlQueue.send(ctrl)
+
     while True:
 
         previewFrames = previewQueue.tryGetAll()
@@ -140,11 +159,13 @@ with dai.Device(pipeline) as dev:
             ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.AUTO)
             ctrl.setAutoFocusTrigger()
             controlQueue.send(ctrl)
+            settings.update_value("autofocus", False)
         elif key == ord('f'):
             print("Autofocus enable, continuous")
             ctrl = dai.CameraControl()
             ctrl.setAutoFocusMode(dai.CameraControl.AutoFocusMode.CONTINUOUS_VIDEO)
             controlQueue.send(ctrl)
+            settings.update_value("autofocus", True)
         elif key == ord('e'):
             print("Autoexposure enable")
             ctrl = dai.CameraControl()
